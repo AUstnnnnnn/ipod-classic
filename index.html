@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPod Classic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #f0f0f0;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .ipod-body {
+            background: linear-gradient(160deg, #d5d5d5 0%, #e8e8e8 15%, #f0f0f0 40%, #e0e0e0 60%, #c5c5c5 85%, #b8b8b8 100%);
+            box-shadow:
+                0 25px 80px rgba(0,0,0,0.35),
+                0 10px 20px rgba(0,0,0,0.2),
+                inset 0 2px 3px rgba(255,255,255,0.9),
+                inset 0 -2px 3px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            overflow: hidden;
+        }
+
+        .ipod-body::before {
+            display: none;
+        }
+
+        .dynamic-gloss {
+            position: absolute;
+            top: -10%;
+            left: -10%;
+            right: -10%;
+            height: 70%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 40%, transparent 100%);
+            border-radius: 50% 50% 40px 40px;
+            pointer-events: none;
+            transition: transform 0.1s ease-out, opacity 0.2s ease;
+            transform-origin: center top;
+        }
+
+        .dynamic-gloss::after {
+            content: '';
+            position: absolute;
+            top: 15%;
+            left: 15%;
+            right: 15%;
+            height: 25%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+            border-radius: 40px 40px 0 0;
+            filter: blur(4px);
+        }
+
+        .screen-bezel {
+            background: #0a0a0a;
+            box-shadow:
+                inset 0 3px 6px rgba(0,0,0,0.9),
+                inset 0 1px 2px rgba(0,0,0,0.8),
+                0 2px 4px rgba(255,255,255,0.2);
+            border-radius: 8px;
+        }
+
+        .lcd-screen {
+            background: #f5f5f7;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.08);
+            image-rendering: pixelated;
+        }
+
+        .lcd-screen {
+            background: #ffffff;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        .menu-item {
+            transition: all 0.1s ease;
+        }
+
+        .menu-item.selected {
+            background: linear-gradient(180deg, #4a90e2 0%, #357abd 100%);
+            color: white;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        .menu-item {
+            border-bottom: 1px solid transparent;
+        }
+
+        .menu-item.selected + .menu-item {
+            border-top-color: rgba(0,0,0,0.05);
+        }
+
+        .click-wheel {
+            background: linear-gradient(135deg, #f8f8f8 0%, #ffffff 30%, #f5f5f5 70%, #ebebeb 100%);
+            box-shadow:
+                0 3px 12px rgba(0,0,0,0.15),
+                inset 0 2px 4px rgba(255,255,255,1),
+                inset 0 -2px 4px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .center-btn {
+            background: radial-gradient(circle at 30% 30%, #f5f5f5 0%, #e0e0e0 50%, #d5d5d5 100%);
+            box-shadow:
+                0 3px 6px rgba(0,0,0,0.2),
+                inset 0 1px 2px rgba(255,255,255,0.8),
+                inset 0 -1px 2px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.08);
+        }
+
+        .center-btn:active {
+            background: radial-gradient(circle at 30% 30%, #e0e0e0 0%, #d5d5d5 50%, #c8c8c8 100%);
+            box-shadow:
+                inset 0 2px 4px rgba(0,0,0,0.15),
+                0 1px 2px rgba(0,0,0,0.1);
+            transform: scale(0.96);
+        }
+
+        .wheel-btn {
+            color: #666666;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: transform 0.1s ease, opacity 0.1s ease, color 0.1s ease;
+            cursor: pointer;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.9);
+            user-select: none;
+            pointer-events: none;
+            transform-origin: center;
+        }
+
+        .wheel-btn:active {
+            color: #666666;
+        }
+
+        .wheel-touch-area {
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .wheel-touch-area:active {
+            background: rgba(0,0,0,0.03);
+            border-radius: 50%;
+        }
+
+        #btn-menu:active, #btn-prev:active, #btn-next:active, #btn-play:active {
+            background: rgba(0,0,0,0.03);
+            border-radius: 50%;
+        }
+
+        .center-btn {
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            box-shadow:
+                0 2px 4px rgba(0,0,0,0.2),
+                inset 0 1px 0 rgba(255,255,255,0.8);
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .center-btn:active {
+            background: #d0d0d0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            transform: scale(0.95);
+        }
+
+        .progress-bar {
+            background: linear-gradient(180deg, #e5e7eb 0%, #d1d5db 100%);
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .progress-fill {
+            background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 0 4px rgba(59,130,246,0.4);
+        }
+
+        .scrubber {
+            background: #ffffff;
+            border: 1px solid #9ca3af;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transform: rotate(45deg);
+        }
+
+        /* Dark mode styles */
+        .dark-mode .scrubber {
+            background: #9ae69a;
+            border-color: #39c557;
+            box-shadow: 0 0 8px rgba(154, 230, 154, 0.6);
+        }
+
+        /* Dark mode gloss - more subtle and green-tinted */
+        .dark-mode .dynamic-gloss {
+            background: linear-gradient(180deg, rgba(57, 197, 87, 0.15) 0%, rgba(57, 197, 87, 0.05) 40%, transparent 100%);
+        }
+
+        .dark-mode .dynamic-gloss::after {
+            background: linear-gradient(180deg, rgba(57, 197, 87, 0.3) 0%, rgba(57, 197, 87, 0.1) 50%, transparent 100%);
+        }
+
+        /* Dark mode album art placeholder */
+        .dark-mode .album-art-placeholder {
+            background: linear-gradient(135deg, #1a3a1a 0%, #0d2815 100%);
+            border-color: #39c557;
+        }
+
+        /* Dark mode click wheel */
+        .dark-mode .click-wheel {
+            background: linear-gradient(135deg, #2a2a2a 0%, #333333 30%, #2d2d2d 70%, #222222 100%);
+            border-color: rgba(57, 197, 87, 0.2);
+        }
+
+        .dark-mode .center-btn {
+            background: radial-gradient(circle at 30% 30%, #3a3a3a 0%, #2a2a2a 50%, #1a1a1a 100%);
+        }
+
+        .dark-mode .wheel-btn {
+            color: #9ae69a;
+            text-shadow: 0 0 5px rgba(154, 230, 154, 0.5);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .screen-content {
+            animation: fadeIn 0.2s ease;
+        }
+
+        .battery-icon {
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
+        }
+
+        .wheel-touch-area {
+            cursor: pointer;
+            transition: all 0.05s;
+        }
+
+        #clickwheel:active {
+            transform: scale(0.98);
+        }
+
+        .click-wheel {
+            transition: transform 0.1s ease;
+        }
+
+        .wheel-btn {
+            pointer-events: none;
+        }
+
+        .wheel-touch-area {
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        #clickwheel {
+            transition: transform 0.05s ease;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .album-art-placeholder {
+            background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+
+    <!-- iPod Container -->
+    <div class="ipod-body relative w-[360px] h-[600px] rounded-[40px] flex flex-col items-center pt-8 pb-10 px-6">
+        <!-- Dynamic Gloss Overlay -->
+        <div class="dynamic-gloss" id="dynamic-gloss"></div>
+
+        <!-- Screen Area -->
+        <div class="screen-bezel w-[300px] h-[260px] rounded-lg p-3 mb-10">
+            <div class="lcd-screen w-full h-full rounded overflow-hidden relative flex flex-col">
+
+                <!-- Status Bar -->
+                <div class="h-6 bg-gray-100 border-b border-gray-200 flex items-center justify-between px-2 text-[10px] font-bold text-gray-600">
+                    <span class="tracking-wide">iPod</span>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="play" class="w-3 h-3 fill-current text-gray-500 opacity-0 transition-opacity" id="status-play-icon"></i>
+                        <div class="flex items-center gap-0.5">
+                            <div class="w-5 h-2 border border-gray-400 rounded-sm relative">
+                                <div class="absolute inset-0.5 bg-gray-500 rounded-[1px] w-[80%]" id="battery-fill"></div>
+                            </div>
+                            <div class="w-0.5 h-1 bg-gray-400 rounded-r-sm"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="flex-1 flex overflow-hidden relative" id="screen-container">
+
+                    <!-- Menu View (Split Screen) -->
+                    <div id="menu-view" class="flex w-full h-full">
+                        <!-- Left Panel - Menu -->
+                        <div class="w-[60%] h-full flex flex-col border-r border-gray-200">
+                            <div id="menu-list" class="flex-1 overflow-hidden flex flex-col text-sm font-semibold text-gray-800">
+                                <!-- Menu items injected here -->
+                            </div>
+                        </div>
+
+                        <!-- Right Panel - Album Art Preview -->
+                        <div class="w-[40%] h-full bg-gray-50 flex items-center justify-center p-3">
+                            <div id="preview-art" class="album-art-placeholder w-full aspect-square rounded shadow-sm flex items-center justify-center">
+                                <i data-lucide="music" class="w-8 h-8 text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Now Playing View (Full Screen Overlay) -->
+                    <div id="now-playing-view" class="absolute inset-0 bg-white flex flex-col hidden z-20" style="width: 100%; height: 100%;">
+                        <!-- Now Playing Header -->
+                        <div class="h-6 flex items-center justify-center border-b border-gray-200 bg-gray-50 flex-shrink-0">
+                            <span class="text-[10px] font-bold text-gray-500 tracking-wide">Now Playing</span>
+                        </div>
+
+                        <!-- Album Art - Large and Centered like real iPod -->
+                        <div class="flex-1 flex items-center justify-center p-4 min-h-0">
+                            <div id="np-art" class="album-art-placeholder w-48 h-48 rounded shadow-lg flex items-center justify-center flex-shrink-0 border border-gray-200 bg-gray-100">
+                                <i data-lucide="music" class="w-16 h-16 text-gray-300"></i>
+                            </div>
+                        </div>
+
+                        <!-- Track Info Below Art -->
+                        <div class="px-4 pb-2 text-center flex-shrink-0">
+                            <div id="np-title" class="text-sm font-bold text-gray-900 truncate mb-0.5">No Song</div>
+                            <div id="np-artist" class="text-xs text-gray-500 truncate">Unknown Artist</div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="h-14 px-4 pb-3 flex flex-col justify-end bg-white flex-shrink-0" id="np-progress-container">
+                            <div class="flex items-center justify-between text-[10px] font-bold text-gray-500 mb-1">
+                                <span id="time-elapsed">0:00</span>
+                                <span id="time-remaining">-0:00</span>
+                            </div>
+                            <div class="progress-bar h-2 rounded-full relative cursor-pointer" id="progress-container">
+                                <div class="progress-fill h-full rounded-full relative" id="progress-fill" style="width: 0%">
+                                    <div class="scrubber absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 -mr-1.5"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Click Wheel -->
+        <div class="relative w-[220px] h-[220px] select-none" id="clickwheel-container">
+            <!-- Wheel Base -->
+            <div class="click-wheel absolute inset-0 rounded-full flex items-center justify-center" id="clickwheel">
+
+                <!-- Touch Areas -->
+                <div class="absolute inset-0 rounded-full overflow-hidden">
+                    <!-- Top - Menu -->
+                    <div class="wheel-touch-area absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 flex items-end justify-center pb-2" id="btn-menu">
+                        <span class="wheel-btn">MENU</span>
+                    </div>
+
+                    <!-- Left - Previous -->
+                    <div class="wheel-touch-area absolute left-0 top-1/2 -translate-y-1/2 w-16 h-16 flex items-center justify-end pr-2" id="btn-prev">
+                        <span class="wheel-btn text-lg">◀◀</span>
+                    </div>
+
+                    <!-- Right - Next -->
+                    <div class="wheel-touch-area absolute right-0 top-1/2 -translate-y-1/2 w-16 h-16 flex items-center pl-2" id="btn-next">
+                        <span class="wheel-btn text-lg">▶▶</span>
+                    </div>
+
+                    <!-- Bottom - Play/Pause -->
+                    <div class="wheel-touch-area absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-16 flex items-start justify-center pt-2" id="btn-play">
+                        <span class="wheel-btn text-sm">▶❚❚</span>
+                    </div>
+                </div>
+
+                <!-- Center Button -->
+                <div class="center-btn w-20 h-20 rounded-full flex items-center justify-center relative z-10" id="btn-center">
+                </div>
+
+
+            </div>
+        </div>
+
+        <!-- Hidden File Input -->
+        <input type="file" id="file-input" multiple accept="audio/*" onchange="handleFileSelect(event)">
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Audio Context for UI sounds - create on first interaction to follow autoplay policies
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // State Management
+        const state = {
+            currentMenu: 'main',
+            menuStack: [],
+            selectedIndex: 0,
+            songs: [],
+            currentSongIndex: -1,
+            isPlaying: false,
+            audio: new Audio(),
+            currentTime: 0,
+            duration: 0,
+            shuffle: false,
+            repeat: false,
+            darkMode: false
+        };
+
+        // Menu Definitions
+        const menus = {
+            main: ['Music', 'Videos', 'Photos', 'Podcasts', 'Extras', 'Settings', 'Shuffle Songs', 'Now Playing'],
+            music: ['Import Songs', 'Artists', 'Albums', 'Songs', 'Playlists', 'Now Playing'],
+            settings: ['About', 'Backlight', 'EQ', 'Shuffle', 'Repeat', 'Reset'],
+            extras: ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Classic Silver'],
+            songs: []
+        };
+
+        // UI Sound Effects - Authentic iPod Mechanical Click Wheel Sounds
+        function playClick(high = false) {
+            initAudio();
+
+            const now = audioCtx.currentTime;
+
+            // White noise burst for mechanical texture
+            const bufferSize = audioCtx.sampleRate * 0.01; // 10ms buffer
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            const noiseGain = audioCtx.createGain();
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+
+            // Bandpass around 3-4kHz for that plastic click texture
+            noiseFilter.type = 'bandpass';
+            noiseFilter.frequency.value = high ? 4000 : 3500;
+            noiseFilter.Q.value = 15;
+
+            noiseGain.gain.setValueAtTime(0, now);
+            noiseGain.gain.linearRampToValueAtTime(0.8, now + 0.0005);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
+
+            // Sharp transient click - very high frequency short sine
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(high ? 6000 : 5000, now);
+
+            oscGain.gain.setValueAtTime(0, now);
+            oscGain.gain.linearRampToValueAtTime(1.0, now + 0.0003);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
+
+            noise.start(now);
+            noise.stop(now + 0.01);
+            osc.start(now);
+            osc.stop(now + 0.015);
+        }
+
+        function playSelect() {
+            initAudio();
+
+            const now = audioCtx.currentTime;
+
+            // Two short clicks for select - mechanical button press
+            // First click - high pitched tick
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(4000, now);
+
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(1.0, now + 0.0003);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+
+            // Second click - slightly lower, tiny delay
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(3500, now + 0.003);
+
+            gain2.gain.setValueAtTime(0, now + 0.003);
+            gain2.gain.linearRampToValueAtTime(0.8, now + 0.0033);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
+
+            osc1.start(now);
+            osc1.stop(now + 0.015);
+            osc2.start(now + 0.003);
+            osc2.stop(now + 0.020);
+        }
+
+        // IndexedDB for song persistence
+        const DB_NAME = 'iPodMusicDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'songs';
+        let db;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const database = event.target.result;
+                    if (!database.objectStoreNames.contains(STORE_NAME)) {
+                        const store = database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                        store.createIndex('name', 'name', { unique: false });
+                    }
+                };
+            });
+        }
+
+        async function saveSongsToDB(songs) {
+            if (!db) return;
+
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+
+            // Clear existing songs
+            await store.clear();
+
+            // Store each song with its blob
+            for (const song of songs) {
+                const arrayBuffer = await song.file.arrayBuffer();
+                await store.add({
+                    name: song.name,
+                    artist: song.artist,
+                    album: song.album,
+                    data: arrayBuffer,
+                    type: song.file.type
+                });
+            }
+        }
+
+        async function loadSongsFromDB() {
+            if (!db) return [];
+
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = () => {
+                    const storedSongs = request.result;
+                    const songs = storedSongs.map(s => {
+                        const blob = new Blob([s.data], { type: s.type });
+                        const url = URL.createObjectURL(blob);
+                        const file = new File([blob], s.name, { type: s.type });
+
+                        return {
+                            name: s.name,
+                            artist: s.artist,
+                            album: s.album,
+                            url: url,
+                            art: null,
+                            file: file,
+                            id: s.id
+                        };
+                    });
+                    resolve(songs);
+                };
+
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Clickwheel State
+        let wheelState = {
+            isTouching: false,
+            lastAngle: null,
+            lastTime: null,
+            accumulatedRotation: 0,
+            touchStartX: 0,
+            touchStartY: 0,
+            isOnWheel: false,
+            isDragging: false,
+            dragThreshold: 5, // pixels to consider it a drag vs click
+            touchStartTime: 0
+        };
+
+        // Initialize Clickwheel - also initializes audio on first interaction
+        function initClickwheel() {
+            // Initialize audio context on first user interaction
+            document.body.addEventListener('click', initAudio, { once: true });
+            document.body.addEventListener('touchstart', initAudio, { once: true });
+            document.body.addEventListener('keydown', initAudio, { once: true });
+
+            const wheel = document.getElementById('clickwheel');
+            const centerBtn = document.getElementById('btn-center');
+            const menuBtn = document.getElementById('btn-menu');
+            const prevBtn = document.getElementById('btn-prev');
+            const nextBtn = document.getElementById('btn-next');
+            const playBtn = document.getElementById('btn-play');
+
+            // Wheel circular scrolling - attach to the wheel itself but detect ring area
+            wheel.addEventListener('mousedown', handleWheelTouchStart);
+            wheel.addEventListener('touchstart', handleWheelTouchStart, { passive: false });
+
+            // Use window for move/end to catch events outside the element
+            window.addEventListener('mousemove', handleWheelTouchMove);
+            window.addEventListener('touchmove', handleWheelTouchMove, { passive: false });
+
+            window.addEventListener('mouseup', handleWheelTouchEnd);
+            window.addEventListener('touchend', handleWheelTouchEnd);
+
+            // Also handle cancel events
+            window.addEventListener('touchcancel', handleWheelTouchEnd);
+
+            // Center button
+            centerBtn.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                wheelState.touchStartTime = Date.now();
+                wheelState.isDragging = false;
+                centerBtn.style.transform = 'scale(0.95)';
+            });
+
+            centerBtn.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+                centerBtn.style.transform = 'scale(1)';
+                const timeDiff = Date.now() - wheelState.touchStartTime;
+                if (!wheelState.isDragging && timeDiff < 300) {
+                    playSelect();
+                    handleCenter();
+                }
+            });
+
+            centerBtn.addEventListener('mouseleave', () => {
+                centerBtn.style.transform = 'scale(1)';
+            });
+
+            // Wheel buttons using the unified handler
+            handleButtonClick('btn-menu', handleMenu);
+            handleButtonClick('btn-prev', () => { if (state.isPlaying) skipPrev(); });
+            handleButtonClick('btn-next', () => { if (state.isPlaying) skipNext(); });
+            handleButtonClick('btn-play', togglePlayPause);
+
+            // Prevent context menu
+            wheel.addEventListener('contextmenu', e => e.preventDefault());
+            centerBtn.addEventListener('contextmenu', e => e.preventDefault());
+        }
+
+        function handleWheelTouchStart(e) {
+            e.preventDefault();
+            const rect = document.getElementById('clickwheel').getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            // Check if touch is anywhere on the wheel (including buttons and center)
+            const distFromCenter = Math.sqrt(Math.pow(clientX - centerX, 2) + Math.pow(clientY - centerY, 2));
+            const wheelRadius = rect.width / 2;
+
+            if (distFromCenter <= wheelRadius) {
+                wheelState.isTouching = true;
+                wheelState.isOnWheel = true;
+                wheelState.isDragging = false;
+                wheelState.touchStartX = clientX;
+                wheelState.touchStartY = clientY;
+                wheelState.touchStartTime = Date.now();
+                wheelState.lastAngle = Math.atan2(clientY - centerY, clientX - centerX);
+                wheelState.lastTime = Date.now();
+                wheelState.accumulatedRotation = 0;
+
+                document.getElementById('clickwheel').style.transform = 'scale(0.98)';
+            }
+        }
+
+        function handleWheelTouchMove(e) {
+            if (!wheelState.isTouching || !wheelState.isOnWheel) return;
+
+            // Check if mouse button is still pressed (for mouse events)
+            if (e.type === 'mousemove' && e.buttons !== 1) {
+                handleWheelTouchEnd(e);
+                return;
+            }
+
+            e.preventDefault();
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            // Check if moved enough to be considered a drag
+            const moveDist = Math.sqrt(Math.pow(clientX - wheelState.touchStartX, 2) + Math.pow(clientY - wheelState.touchStartY, 2));
+            if (moveDist > wheelState.dragThreshold) {
+                wheelState.isDragging = true;
+            }
+
+            const rect = document.getElementById('clickwheel').getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const currentAngle = Math.atan2(clientY - centerY, clientX - centerX);
+
+            // Calculate angle difference
+            let angleDiff = currentAngle - wheelState.lastAngle;
+
+            // Normalize angle difference to -PI to PI
+            if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+            wheelState.accumulatedRotation += angleDiff;
+            wheelState.lastAngle = currentAngle;
+
+            // Determine scroll threshold (about 20 degrees)
+            const threshold = Math.PI / 9;
+
+            while (Math.abs(wheelState.accumulatedRotation) >= threshold) {
+                if (wheelState.accumulatedRotation > 0) {
+                    // Clockwise - scroll down
+                    navigateMenu(1);
+                    wheelState.accumulatedRotation -= threshold;
+                } else {
+                    // Counter-clockwise - scroll up
+                    navigateMenu(-1);
+                    wheelState.accumulatedRotation += threshold;
+                }
+            }
+        }
+
+        function handleWheelTouchEnd(e) {
+            wheelState.isTouching = false;
+            wheelState.isOnWheel = false;
+            wheelState.lastAngle = null;
+            wheelState.accumulatedRotation = 0;
+            document.getElementById('clickwheel').style.transform = 'scale(1)';
+        }
+
+        // Handle button clicks - check if it was a drag or a click
+        function handleButtonClick(buttonId, action) {
+            const btn = document.getElementById(buttonId);
+            const btnInner = btn.querySelector('.wheel-btn');
+
+            btn.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                wheelState.touchStartTime = Date.now();
+                wheelState.isDragging = false;
+                btnInner.style.transform = 'scale(0.85)';
+                btnInner.style.opacity = '0.7';
+            });
+
+            btn.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+                btnInner.style.transform = 'scale(1)';
+                btnInner.style.opacity = '1';
+
+                // Only trigger if it wasn't a drag and was a quick press
+                const timeDiff = Date.now() - wheelState.touchStartTime;
+                if (!wheelState.isDragging && timeDiff < 300) {
+                    playClick(buttonId === 'btn-menu');
+                    action();
+                }
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                btnInner.style.transform = 'scale(1)';
+                btnInner.style.opacity = '1';
+            });
+        }
+
+        // Safety: reset wheel state if mouse leaves window
+        document.addEventListener('mouseleave', () => {
+            if (wheelState.isTouching) {
+                handleWheelTouchEnd();
+            }
+        });
+
+        // Safety: reset on visibility change (tab switch, etc)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && wheelState.isTouching) {
+                handleWheelTouchEnd();
+            }
+        });
+
+        // Backlight/Dark Mode Toggle
+        function toggleBacklight() {
+            state.darkMode = !state.darkMode;
+            const screen = document.querySelector('.lcd-screen');
+            const menuPanel = document.querySelector('#menu-view > div:first-child');
+            const nowPlaying = document.getElementById('now-playing-view');
+            const ipodBody = document.querySelector('.ipod-body');
+            const body = document.body;
+            const previewPanel = document.querySelector('#menu-view > div:last-child');
+            const statusBar = screen.querySelector('.h-6');
+
+            // Add/remove dark mode class to body for CSS styling
+            if (state.darkMode) {
+                document.body.classList.add('dark-mode');
+                ipodBody.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+                ipodBody.classList.remove('dark-mode');
+            }
+
+            if (state.darkMode) {
+                // Dark mode (Game Boy green backlight) - smooth transition
+                screen.style.transition = 'all 0.3s ease';
+                screen.style.background = '#1b2d1b';
+                screen.style.boxShadow = 'inset 0 0 40px rgba(57, 197, 87, 0.4), 0 0 40px rgba(57, 197, 87, 0.6)';
+
+                menuPanel.style.transition = 'all 0.3s ease';
+                menuPanel.style.background = '#1b2d1b';
+                menuPanel.style.borderColor = '#0d2815';
+
+                previewPanel.style.transition = 'all 0.3s ease';
+                previewPanel.style.background = '#152b15';
+
+                nowPlaying.style.transition = 'all 0.3s ease';
+                nowPlaying.style.background = '#1b2d1b';
+                nowPlaying.style.boxShadow = 'inset 0 0 30px rgba(57, 197, 87, 0.3)';
+
+                // Now Playing header
+                const npHeader = nowPlaying.querySelector('.h-6');
+                npHeader.style.transition = 'all 0.3s ease';
+                npHeader.style.background = '#0d2815';
+                npHeader.style.borderColor = '#39c557';
+                npHeader.querySelector('span').style.color = '#9ae69a';
+
+                // Game Boy green text colors for track info
+                document.getElementById('np-title').style.transition = 'color 0.3s ease';
+                document.getElementById('np-title').style.color = '#9ae69a';
+                document.getElementById('np-title').style.textShadow = '0 0 10px rgba(154, 230, 154, 0.5)';
+
+                document.getElementById('np-artist').style.transition = 'color 0.3s ease';
+                document.getElementById('np-artist').style.color = '#6dd66d';
+
+                // Progress bar time text colors
+                document.getElementById('time-elapsed').style.transition = 'color 0.3s ease';
+                document.getElementById('time-elapsed').style.color = '#9ae69a';
+                document.getElementById('time-remaining').style.transition = 'color 0.3s ease';
+                document.getElementById('time-remaining').style.color = '#9ae69a';
+
+                // Progress bar container in dark mode
+                const progressBar = document.querySelector('.progress-bar');
+                progressBar.style.background = 'linear-gradient(180deg, #0d2815 0%, #1a3a1a 100%)';
+                progressBar.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.5)';
+
+                // Progress fill in dark mode - green gradient
+                const progressFill = document.querySelector('.progress-fill');
+                progressFill.style.background = 'linear-gradient(180deg, #39c557 0%, #2d8f43 100%)';
+                progressFill.style.boxShadow = '0 0 6px rgba(57, 197, 87, 0.6)';
+
+                // Now Playing progress container background
+                const npProgressContainer = document.getElementById('np-progress-container');
+                if (npProgressContainer) {
+                    npProgressContainer.style.background = '#1b2d1b';
+                }
+
+                // Album art placeholder in now playing
+                const npArt = document.getElementById('np-art');
+                npArt.style.background = 'linear-gradient(135deg, #1a3a1a 0%, #0d2815 100%)';
+                npArt.style.borderColor = '#39c557';
+                npArt.style.boxShadow = '0 0 20px rgba(57, 197, 87, 0.3)';
+
+                // Status bar in dark mode - green tint
+                statusBar.style.transition = 'all 0.3s ease';
+                statusBar.style.background = '#0d2815';
+                statusBar.style.borderColor = '#39c557';
+                statusBar.style.color = '#9ae69a';
+
+                // Battery icon color
+                statusBar.querySelector('#battery-fill').style.background = '#39c557';
+
+                // Darken the iPod body
+                ipodBody.style.transition = 'all 0.3s ease';
+                ipodBody.style.background = 'linear-gradient(160deg, #2a2a2a 0%, #333333 15%, #3d3d3d 40%, #2f2f2f 60%, #222222 85%, #1a1a1a 100%)';
+                ipodBody.style.boxShadow = '0 25px 80px rgba(0,0,0,0.6), 0 10px 20px rgba(0,0,0,0.4), inset 0 2px 3px rgba(255,255,255,0.1), inset 0 -2px 3px rgba(0,0,0,0.3)';
+
+                // Darken page background
+                body.style.transition = 'all 0.3s ease';
+                body.classList.remove('from-gray-200', 'to-gray-300');
+                body.classList.add('from-gray-900', 'to-gray-800');
+
+                // Update album art icon color if no art
+                const npArtIcon = npArt.querySelector('i');
+                if (npArtIcon) {
+                    npArtIcon.style.color = '#39c557';
+                }
+
+            } else {
+                // Light mode (normal) - smooth transition back
+                screen.style.background = '#ffffff';
+                screen.style.boxShadow = 'inset 0 0 20px rgba(0,0,0,0.1)';
+
+                menuPanel.style.background = '';
+                menuPanel.style.color = '';
+                menuPanel.style.borderColor = '';
+
+                previewPanel.style.background = '';
+
+                nowPlaying.style.background = '#ffffff';
+                nowPlaying.style.boxShadow = '';
+
+                // Reset Now Playing header
+                const npHeader = nowPlaying.querySelector('.h-6');
+                npHeader.style.background = '';
+                npHeader.style.borderColor = '';
+                npHeader.querySelector('span').style.color = '';
+
+                document.getElementById('np-title').style.color = '';
+                document.getElementById('np-title').style.textShadow = '';
+                document.getElementById('np-artist').style.color = '';
+
+                // Reset progress bar times
+                document.getElementById('time-elapsed').style.color = '';
+                document.getElementById('time-remaining').style.color = '';
+
+                // Reset progress bar container
+                const progressBar = document.querySelector('.progress-bar');
+                progressBar.style.background = '';
+                progressBar.style.boxShadow = '';
+
+                // Reset progress fill
+                const progressFill = document.querySelector('.progress-fill');
+                progressFill.style.background = '';
+                progressFill.style.boxShadow = '';
+
+                // Reset Now Playing progress container
+                const npProgressContainer = document.getElementById('np-progress-container');
+                if (npProgressContainer) {
+                    npProgressContainer.style.background = '';
+                }
+
+                // Reset album art placeholder
+                const npArt = document.getElementById('np-art');
+                npArt.style.background = '';
+                npArt.style.borderColor = '';
+                npArt.style.boxShadow = '';
+
+                // Reset album art icon color
+                const npArtIcon = npArt.querySelector('i');
+                if (npArtIcon) {
+                    npArtIcon.style.color = '';
+                }
+
+                // Reset status bar
+                statusBar.style.background = '';
+                statusBar.style.borderColor = '';
+                statusBar.style.color = '';
+                statusBar.querySelector('#battery-fill').style.background = '';
+
+                // Reset iPod body to silver
+                ipodBody.style.background = '';
+                ipodBody.style.boxShadow = '';
+
+                // Reset page background
+                body.classList.remove('from-gray-900', 'to-gray-800');
+                body.classList.add('from-gray-200', 'to-gray-300');
+            }
+
+            // Re-render menu to apply styles to items
+            renderMenu();
+            playSelect();
+        }
+
+        // Parallax effect following mouse
+        function initParallax() {
+            let rafId = null;
+            let mouseX = 0;
+            let mouseY = 0;
+            let isActive = false;
+
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+
+                if (!isActive) {
+                    isActive = true;
+                    rafId = requestAnimationFrame(updateParallax);
+                }
+            });
+
+            function updateParallax() {
+                const ipod = document.querySelector('.ipod-body');
+                const gloss = document.getElementById('dynamic-gloss');
+                const rect = ipod.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                // Calculate offset from center (-1 to 1)
+                const offsetX = (mouseX - centerX) / (window.innerWidth / 2);
+                const offsetY = (mouseY - centerY) / (window.innerHeight / 2);
+
+                // Linked parallax - body and gloss move together
+                const moveX = offsetX * 12;
+                const moveY = offsetY * 12;
+
+                // Same rotation for both
+                const rotateY = offsetX * 2;
+                const rotateX = -offsetY * 2;
+
+                ipod.style.transform = `translate(${moveX}px, ${moveY}px) perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+
+                // Gloss moves identically to body (linked parallax)
+                // Slightly offset to simulate light source angle
+                gloss.style.transform = `translate(${moveX * 0.8}px, ${moveY * 0.8}px) rotate(${rotateY}deg)`;
+
+                // Adjust gloss intensity based on viewing angle
+                const intensity = 1 - Math.abs(offsetX) * 0.25;
+                gloss.style.opacity = intensity;
+
+                isActive = false;
+            }
+        }
+
+        initParallax();
+
+        // Reset parallax when mouse leaves
+        document.addEventListener('mouseleave', () => {
+            const ipod = document.querySelector('.ipod-body');
+            const gloss = document.getElementById('dynamic-gloss');
+            ipod.style.transform = '';
+            gloss.style.transform = '';
+            gloss.style.opacity = '1';
+        });
+
+        function navigateMenu(direction) {
+            playClick(false);
+
+            const currentList = getCurrentMenuList();
+            const newIndex = state.selectedIndex + direction;
+
+            if (newIndex >= 0 && newIndex < currentList.length) {
+                state.selectedIndex = newIndex;
+                renderMenu();
+            }
+        }
+
+        function handleWheel(direction) {
+            // Legacy support for keyboard/click
+            playClick(direction === 'up' || direction === 'down');
+
+            const currentList = getCurrentMenuList();
+
+            if (direction === 'up') {
+                state.selectedIndex = Math.max(0, state.selectedIndex - 1);
+            } else if (direction === 'down') {
+                state.selectedIndex = Math.min(currentList.length - 1, state.selectedIndex + 1);
+            } else if (direction === 'prev') {
+                if (state.isPlaying) skipPrev();
+            } else if (direction === 'next') {
+                if (state.isPlaying) skipNext();
+            }
+
+            renderMenu();
+        }
+
+        function handleCenter() {
+            playSelect();
+
+            const currentList = getCurrentMenuList();
+            const selected = currentList[state.selectedIndex];
+
+            if (!selected) return;
+
+            // Handle actions based on selection
+            if (selected === 'Import Songs') {
+                document.getElementById('file-input').click();
+                return;
+            }
+
+            // Color selection in Extras
+            if (state.currentMenu === 'extras') {
+                const colors = {
+                    'Red': 'linear-gradient(160deg, #d5a5a5 0%, #e8c5c5 15%, #f0d0d0 40%, #e0b0b0 60%, #c58585 85%, #b87878 100%)',
+                    'Blue': 'linear-gradient(160deg, #a5a5d5 0%, #c5c5e8 15%, #d0d0f0 40%, #b0b0e0 60%, #8585c5 85%, #7878b8 100%)',
+                    'Green': 'linear-gradient(160deg, #a5d5a5 0%, #c5e8c5 15%, #d0f0d0 40%, #b0e0b0 60%, #85c585 85%, #78b878 100%)',
+                    'Purple': 'linear-gradient(160deg, #d5a5d5 0%, #e8c5e8 15%, #f0d0f0 40%, #e0b0e0 60%, #c585c5 85%, #b878b8 100%)',
+                    'Orange': 'linear-gradient(160deg, #d5b5a5 0%, #e8d0c5 15%, #f0e0d0 40%, #e0c0b0 60%, #c59585 85%, #b88878 100%)',
+                    'Classic Silver': 'linear-gradient(160deg, #d5d5d5 0%, #e8e8e8 15%, #f0f0f0 40%, #e0e0e0 60%, #c5c5c5 85%, #b8b8b8 100%)'
+                };
+
+                if (colors[selected]) {
+                    document.querySelector('.ipod-body').style.background = colors[selected];
+                    playSelect();
+                    return;
+                }
+            }
+
+            // Backlight toggle
+            if (selected === 'Backlight') {
+                toggleBacklight();
+                return;
+            }
+
+            if (selected === 'Now Playing') {
+                if (state.currentSongIndex >= 0) {
+                    showNowPlaying();
+                }
+                return;
+            }
+
+            if (selected === 'Shuffle Songs' && state.songs.length > 0) {
+                state.shuffle = true;
+                playRandom();
+                return;
+            }
+
+            if (state.currentMenu === 'songs' || (state.currentMenu === 'main' && selected === 'Music' && state.songs.length === 0)) {
+                // Playing a specific song
+                if (state.songs.length > 0) {
+                    const songIndex = state.currentMenu === 'songs' ? state.selectedIndex - (menus.music.includes('Import Songs') ? 1 : 0) : 0;
+                    if (songIndex >= 0) {
+                        playSong(songIndex);
+                        return;
+                    }
+                }
+            }
+
+            // Navigate to submenu
+            const targetMenu = selected.toLowerCase();
+            if (menus[targetMenu] || (targetMenu === 'songs' && state.songs.length > 0)) {
+                state.menuStack.push({
+                    menu: state.currentMenu,
+                    index: state.selectedIndex
+                });
+                state.currentMenu = targetMenu;
+                state.selectedIndex = 0;
+
+                if (targetMenu === 'songs') {
+                    menus.songs = state.songs.map(s => s.name);
+                }
+
+                renderMenu();
+            }
+        }
+
+        function handleMenu() {
+            playClick(true);
+
+            // If in Now Playing view, go back to menu first
+            const nowPlayingView = document.getElementById('now-playing-view');
+            if (!nowPlayingView.classList.contains('hidden')) {
+                showMenu();
+                return;
+            }
+
+            if (state.menuStack.length > 0) {
+                const prev = state.menuStack.pop();
+                state.currentMenu = prev.menu;
+                state.selectedIndex = prev.index;
+                renderMenu();
+            } else {
+                // Already at top, go to main
+                state.currentMenu = 'main';
+                state.selectedIndex = 0;
+                renderMenu();
+            }
+        }
+
+        function getCurrentMenuList() {
+            if (state.currentMenu === 'songs') {
+                return state.songs.length > 0 ? state.songs.map(s => s.name) : ['No Songs'];
+            }
+            return menus[state.currentMenu] || [];
+        }
+
+        // Rendering
+        function renderMenu() {
+            const listEl = document.getElementById('menu-list');
+            const currentList = getCurrentMenuList();
+
+            // Update preview art
+            updatePreviewArt();
+
+            // Build menu HTML
+            listEl.innerHTML = '';
+            currentList.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = `menu-item px-3 py-2 text-xs cursor-pointer flex items-center justify-between ${index === state.selectedIndex ? 'selected' : ''}`;
+
+                // Apply dark mode styles if enabled
+                if (state.darkMode) {
+                    div.style.color = '#9ae69a';
+                    div.style.borderColor = 'rgba(57, 197, 87, 0.2)';
+                    div.style.transition = 'all 0.2s ease';
+
+                    if (index === state.selectedIndex) {
+                        div.style.background = 'linear-gradient(180deg, #39c557 0%, #2d8f43 100%)';
+                        div.style.color = '#0d2815';
+                        div.style.textShadow = 'none';
+                        div.style.boxShadow = '0 0 10px rgba(57, 197, 87, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+                        div.style.fontWeight = '700';
+                    } else {
+                        div.style.background = 'transparent';
+                    }
+                } else {
+                    // Reset to light mode styles
+                    div.style.color = '';
+                    div.style.borderColor = '';
+                    div.style.background = '';
+                    div.style.textShadow = '';
+                    div.style.boxShadow = '';
+
+                    if (index === state.selectedIndex) {
+                        div.classList.add('selected');
+                    }
+                }
+
+                // Add arrow for submenus - dark mode appropriate colors
+                const hasSubmenu = menus[item.toLowerCase()] || (item === 'Music' && state.songs.length === 0) || item === 'Songs';
+                let arrow = '';
+                if (hasSubmenu) {
+                    if (state.darkMode) {
+                        arrow = `<span class="text-[10px]" style="color: #6dd66d;">▶</span>`;
+                    } else {
+                        arrow = `<span class="text-[10px] opacity-50">▶</span>`;
+                    }
+                }
+
+                div.innerHTML = `<span class="truncate">${item}</span>${arrow}`;
+
+                // Click to select (for mouse users)
+                div.onclick = () => {
+                    state.selectedIndex = index;
+                    renderMenu();
+                    setTimeout(() => handleCenter(), 100);
+                };
+
+                listEl.appendChild(div);
+            });
+
+            // Scroll selected into view
+            const selectedEl = listEl.children[state.selectedIndex];
+            if (selectedEl) {
+                selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+
+        function updatePreviewArt() {
+            const previewEl = document.getElementById('preview-art');
+            let artHTML = '<i data-lucide="music" class="w-8 h-8 text-gray-400"></i>';
+
+            if (state.currentSongIndex >= 0 && state.songs[state.currentSongIndex]) {
+                const song = state.songs[state.currentSongIndex];
+                if (song.art) {
+                    artHTML = `<img src="${song.art}" class="w-full h-full object-cover rounded">`;
+                }
+            }
+
+            previewEl.innerHTML = artHTML;
+            lucide.createIcons();
+        }
+
+        function showNowPlaying() {
+            document.getElementById('menu-view').classList.add('hidden');
+            const np = document.getElementById('now-playing-view');
+            np.classList.remove('hidden');
+            np.style.display = 'flex';
+
+            // Apply dark mode styles if active
+            if (state.darkMode) {
+                np.style.background = '#1b2d1b';
+                const npHeader = np.querySelector('.h-6');
+                npHeader.style.background = '#0d2815';
+                npHeader.style.borderColor = '#39c557';
+                npHeader.querySelector('span').style.color = '#9ae69a';
+
+                document.getElementById('np-title').style.color = '#9ae69a';
+                document.getElementById('np-title').style.textShadow = '0 0 10px rgba(154, 230, 154, 0.5)';
+                document.getElementById('np-artist').style.color = '#6dd66d';
+                document.getElementById('time-elapsed').style.color = '#9ae69a';
+                document.getElementById('time-remaining').style.color = '#9ae69a';
+
+                // Now Playing progress container
+                const npProgressContainer = document.getElementById('np-progress-container');
+                if (npProgressContainer) {
+                    npProgressContainer.style.background = '#1b2d1b';
+                }
+            }
+
+            updateNowPlaying();
+        }
+
+        function showMenu() {
+            document.getElementById('menu-view').classList.remove('hidden');
+            document.getElementById('now-playing-view').classList.add('hidden');
+            document.getElementById('now-playing-view').style.display = '';
+
+            // Re-apply dark mode styles to menu when returning
+            if (state.darkMode) {
+                const screen = document.querySelector('.lcd-screen');
+                const menuPanel = document.querySelector('#menu-view > div:first-child');
+                const previewPanel = document.querySelector('#menu-view > div:last-child');
+                const statusBar = screen.querySelector('.h-6');
+
+                menuPanel.style.background = '#1b2d1b';
+                menuPanel.style.borderColor = '#0d2815';
+                previewPanel.style.background = '#152b15';
+                screen.style.background = '#1b2d1b';
+                statusBar.style.background = '#0d2815';
+                statusBar.style.borderColor = '#39c557';
+                statusBar.style.color = '#9ae69a';
+                statusBar.querySelector('#battery-fill').style.background = '#39c557';
+
+                // Re-render menu with dark styles
+                renderMenu();
+            }
+        }
+
+        function updateNowPlaying() {
+            if (state.currentSongIndex < 0 || !state.songs[state.currentSongIndex]) return;
+
+            const song = state.songs[state.currentSongIndex];
+            const title = document.getElementById('np-title');
+            const artist = document.getElementById('np-artist');
+
+            title.textContent = song.name.replace(/\.[^/.]+$/, "");
+            artist.textContent = song.artist || 'Unknown Artist';
+
+            // Apply dark mode styles if active
+            if (state.darkMode) {
+                title.style.color = '#93c5fd';
+                title.style.textShadow = '0 0 10px rgba(147, 197, 253, 0.5)';
+                artist.style.color = '#60a5fa';
+            }
+
+            const artEl = document.getElementById('np-art');
+            if (song.art) {
+                artEl.innerHTML = `<img src="${song.art}" class="w-full h-full object-cover">`;
+            } else {
+                const iconColor = state.darkMode ? 'text-[#6dd66d]' : 'text-gray-300';
+                artEl.innerHTML = `<i data-lucide="music" class="w-16 h-16 ${iconColor}"></i>`;
+                lucide.createIcons();
+            }
+        }
+
+        // Audio Functions
+        async function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+
+            files.forEach(file => {
+                const url = URL.createObjectURL(file);
+                state.songs.push({
+                    name: file.name,
+                    artist: 'Unknown Artist',
+                    album: 'Unknown Album',
+                    url: url,
+                    art: null,
+                    file: file
+                });
+            });
+
+            // Save to IndexedDB for persistence
+            await saveSongsToDB(state.songs);
+
+            menus.songs = state.songs.map(s => s.name);
+
+            // Return to music menu
+            if (state.currentMenu === 'songs') {
+                renderMenu();
+            }
+
+            playSelect();
+        }
+
+        function playSong(index) {
+            if (index < 0 || index >= state.songs.length) return;
+
+            state.currentSongIndex = index;
+            const song = state.songs[index];
+
+            state.audio.src = song.url;
+            state.audio.play();
+            state.isPlaying = true;
+
+            updatePlayIcon();
+            showNowPlaying();
+            updateNowPlaying();
+
+            // Update preview
+            updatePreviewArt();
+        }
+
+        function playRandom() {
+            if (state.songs.length === 0) return;
+            const randomIndex = Math.floor(Math.random() * state.songs.length);
+            playSong(randomIndex);
+        }
+
+        function togglePlayPause() {
+            if (state.currentSongIndex < 0) {
+                if (state.songs.length > 0) {
+                    playSong(0);
+                }
+                return;
+            }
+
+            if (state.isPlaying) {
+                state.audio.pause();
+                state.isPlaying = false;
+            } else {
+                state.audio.play();
+                state.isPlaying = true;
+            }
+
+            updatePlayIcon();
+        }
+
+        function skipNext() {
+            if (state.songs.length === 0) return;
+
+            let nextIndex;
+            if (state.shuffle) {
+                nextIndex = Math.floor(Math.random() * state.songs.length);
+            } else {
+                nextIndex = (state.currentSongIndex + 1) % state.songs.length;
+            }
+
+            playSong(nextIndex);
+        }
+
+        function skipPrev() {
+            if (state.songs.length === 0) return;
+
+            if (state.audio.currentTime > 3) {
+                state.audio.currentTime = 0;
+            } else {
+                let prevIndex = state.currentSongIndex - 1;
+                if (prevIndex < 0) prevIndex = state.songs.length - 1;
+                playSong(prevIndex);
+            }
+        }
+
+        function updatePlayIcon() {
+            const icon = document.getElementById('status-play-icon');
+            icon.style.opacity = state.isPlaying ? '1' : '0';
+        }
+
+        // Audio Event Listeners
+        state.audio.addEventListener('timeupdate', () => {
+            if (!state.audio.duration) return;
+
+            const progress = (state.audio.currentTime / state.audio.duration) * 100;
+            document.getElementById('progress-fill').style.width = progress + '%';
+
+            // Update times
+            const elapsed = formatTime(state.audio.currentTime);
+            const remaining = formatTime(state.audio.duration - state.audio.currentTime);
+            document.getElementById('time-elapsed').textContent = elapsed;
+            document.getElementById('time-remaining').textContent = '-' + remaining;
+        });
+
+        state.audio.addEventListener('ended', () => {
+            if (state.repeat) {
+                state.audio.play();
+            } else {
+                skipNext();
+            }
+        });
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Progress bar scrubbing
+        let isScrubbing = false;
+        const progressContainer = document.getElementById('progress-container');
+
+        progressContainer.addEventListener('mousedown', (e) => {
+            isScrubbing = true;
+            handleScrub(e);
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isScrubbing) handleScrub(e);
+        });
+
+        document.addEventListener('mouseup', () => {
+            isScrubbing = false;
+        });
+
+        function handleScrub(e) {
+            const rect = progressContainer.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percentage = Math.max(0, Math.min(1, x / rect.width));
+
+            if (state.audio.duration) {
+                state.audio.currentTime = percentage * state.audio.duration;
+                document.getElementById('progress-fill').style.width = (percentage * 100) + '%';
+            }
+        }
+
+        // Keyboard Controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    handleWheel('up');
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    handleWheel('down');
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    handleWheel('prev');
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    handleWheel('next');
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    handleCenter();
+                    break;
+                case 'Escape':
+                case 'Backspace':
+                    e.preventDefault();
+                    handleMenu();
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    togglePlayPause();
+                    break;
+            }
+        });
+
+
+
+        // Drag and drop support
+        const dropZone = document.querySelector('.ipod-body');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.transform = 'scale(1.02)';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.transform = 'scale(1)';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.transform = 'scale(1)';
+
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
+            if (files.length > 0) {
+                const input = document.getElementById('file-input');
+                const dt = new DataTransfer();
+                files.forEach(f => dt.items.add(f));
+                input.files = dt.files;
+                handleFileSelect({ target: input });
+            }
+        });
+
+        // Initialize with persistence
+        async function init() {
+            await initDB();
+            const storedSongs = await loadSongsFromDB();
+
+            if (storedSongs.length > 0) {
+                state.songs = storedSongs;
+                menus.songs = state.songs.map(s => s.name);
+                console.log(`Restored ${storedSongs.length} songs from library`);
+            }
+
+            renderMenu();
+            initClickwheel();
+
+            // Handle page visibility change to resume audio context if needed
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
