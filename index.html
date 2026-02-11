@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsmediatags@3.9.5/dist/jsmediatags.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/music-metadata-browser@2.7.2/dist/music-metadata-browser.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -583,12 +584,22 @@
                         const song = songs[i];
                         try {
                             const arrayBuffer = await song.file.arrayBuffer();
+
+                            // Prepare art data - store raw bytes if available
+                            let artData = null;
+                            let artFormat = null;
+                            if (song.art && song.pictureData) {
+                                artData = song.pictureData;  // This is already an array from readMetadata
+                                artFormat = song.pictureFormat;
+                            }
+
                             const songData = {
                                 name: song.name || song.title,
                                 title: song.name || song.title,
                                 artist: song.artist || 'Unknown Artist',
                                 album: song.album || 'Unknown Album',
-                                art: song.art || null,
+                                artData: artData,        // Raw image data as array
+                                artFormat: artFormat,    // MIME type of image
                                 data: arrayBuffer,
                                 type: song.file.type
                             };
@@ -644,13 +655,27 @@
                         const url = URL.createObjectURL(blob);
                         const file = new File([blob], s.name, { type: s.type });
 
+                        // Reconstruct album art from stored raw data if available
+                        let artUrl = null;
+                        if (s.artData && s.artFormat) {
+                            try {
+                                // artData is stored as an array, convert back to Uint8Array
+                                const uint8Array = new Uint8Array(s.artData);
+                                const artBlob = new Blob([uint8Array], { type: s.artFormat });
+                                artUrl = URL.createObjectURL(artBlob);
+                                console.log('Reconstructed album art from DB for:', s.name, 'Format:', s.artFormat, 'Size:', uint8Array.length);
+                            } catch (e) {
+                                console.error('Error reconstructing album art for', s.name, e);
+                            }
+                        }
+
                         return {
-                            name: s.name || s.title,
-                            title: s.name || s.title,
+                            name: s.title || s.name,
+                            title: s.title || s.name,
                             artist: s.artist || 'Unknown Artist',
                             album: s.album || 'Unknown Album',
                             url: url,
-                            art: s.art || null,
+                            art: artUrl,
                             file: file,
                             id: s.id
                         };
@@ -1339,41 +1364,288 @@
             }
         }
 
-        // Read metadata from audio file using jsmediatags
-        function readMetadata(file) {
-            return new Promise((resolve, reject) => {
-                if (!window.jsmediatags) {
-                    resolve(null);
-                    return;
-                }
 
-                jsmediatags.read(file, {
-                    onSuccess: function(tag) {
-                        const tags = tag.tags;
-                        const result = {
-                            title: tags.title,
-                            artist: tags.artist,
-                            album: tags.album,
-                            picture: null
-                        };
+// Metadata fallback inference (when files lack tags)
+// Tries: folder structure (Artist/Album/Track) via webkitRelativePath, then common filename patterns.
+function applyMetadataFallback(song, file) {
+    const UNKNOWN_ARTIST = 'Unknown Artist';
+    const UNKNOWN_ALBUM = 'Unknown Album';
 
-                        // Convert album art to data URL if present
-                        if (tags.picture) {
-                            const { data, format } = tags.picture;
-                            const uint8Array = new Uint8Array(data);
-                            const blob = new Blob([uint8Array], { type: format });
-                            const url = URL.createObjectURL(blob);
-                            result.picture = url;
-                        }
+    const hasArtist = song.artist && song.artist !== UNKNOWN_ARTIST;
+    const hasAlbum = song.album && song.album !== UNKNOWN_ALBUM;
+    const hasTitle = song.name && song.name.trim().length > 0;
 
-                        resolve(result);
-                    },
-                    onError: function(error) {
-                        console.log('Error reading metadata:', error);
-                        resolve(null);
-                    }
-                });
+    const rawPath = (file && (file.webkitRelativePath || file.name)) ? (file.webkitRelativePath || file.name) : '';
+    const pathParts = rawPath.split('/').filter(Boolean);
+
+    // Folder heuristic: .../<Artist>/<Album>/<Track.ext>
+    if (pathParts.length >= 3) {
+        const albumCandidate = pathParts[pathParts.length - 2];
+        const artistCandidate = pathParts[pathParts.length - 3];
+        if (!hasAlbum && albumCandidate) song.album = albumCandidate;
+        if (!hasArtist && artistCandidate) song.artist = artistCandidate;
+    } else if (pathParts.length === 2) {
+        // .../<Album>/<Track.ext>
+        const albumCandidate = pathParts[0];
+        if (!hasAlbum && albumCandidate) song.album = albumCandidate;
+    }
+
+    // Filename heuristic (no extension)
+    const base = (file && file.name ? file.name : song.title || song.name || '').replace(/\.[^/.]+$/, '').trim();
+
+    // Patterns:
+    // 1) "Artist - Title"
+    // 2) "Artist - Album - Title"
+    // 3) "Artist - Title - Album"
+    const dashParts = base.split(' - ').map(s => s.trim()).filter(Boolean);
+
+    if (dashParts.length === 2) {
+        const [p1, p2] = dashParts;
+        if (!hasArtist) song.artist = p1;
+        if (!hasTitle) { song.name = p2; song.title = p2; }
+    } else if (dashParts.length === 3) {
+        const [p1, p2, p3] = dashParts;
+
+        if (!hasArtist) song.artist = p1;
+
+        // Default assumption: Artist - Album - Title
+        if (!hasAlbum) song.album = p2;
+        if (!hasTitle) { song.name = p3; song.title = p3; }
+
+        // If p2 looks more like a title and p3 looks more like an album, swap (Artist - Title - Album)
+        const p2LooksTitle = /\(|\)|feat\.?\s|ft\.?\s|\[|\]|\d{1,2}:\d{2}/i.test(p2);
+        const p3LooksAlbum = !/feat\.?\s|ft\.?\s/i.test(p3) && p3.length <= 64;
+
+        if (p2LooksTitle && p3LooksAlbum) {
+            if (!hasTitle) { song.name = p2; song.title = p2; }
+            if (!hasAlbum) song.album = p3;
+        }
+    }
+
+    // Final cleanup: avoid empty strings
+    if (!song.artist || song.artist.trim() === '') song.artist = UNKNOWN_ARTIST;
+    if (!song.album || song.album.trim() === '') song.album = UNKNOWN_ALBUM;
+    if (!song.name || song.name.trim() === '') song.name = base || 'Unknown Title';
+    song.title = song.name;
+}
+
+        // Read metadata from audio file using music-metadata-browser (fallback to jsmediatags)
+        async function readMetadata(file) {
+            // Helper: normalize output shape
+            const empty = () => ({
+                title: null,
+                artist: null,
+                album: null,
+                picture: null,
+                pictureData: null,
+                pictureFormat: null
             });
+
+            // Minimal APEv2 reader for MP3s that store tags as APE (common with some downloaders)
+            // Spec: footer/header "APETAGEX" at end; items: [valueSize][flags][key\0][valueBytes]
+            async function parseAPEv2FromFile(fileObj) {
+                try {
+                    const FOOTER_SIZE = 32;
+                    const MAX_TAIL = 1024 * 512; // read last 512KB to find/parse the tag
+                    if (!fileObj || fileObj.size < FOOTER_SIZE) return null;
+
+                    const tailStart = Math.max(0, fileObj.size - MAX_TAIL);
+                    const tailBlob = fileObj.slice(tailStart, fileObj.size);
+                    const tailBuf = await tailBlob.arrayBuffer();
+                    const tail = new Uint8Array(tailBuf);
+
+                    // Footer is typically last 32 bytes of file (or last 32 bytes of tag area).
+                    // We'll first check absolute file end.
+                    const footerOffset = tail.length - FOOTER_SIZE;
+                    if (footerOffset < 0) return null;
+
+                    function readLE32(u8, off) {
+                        return (u8[off] | (u8[off+1] << 8) | (u8[off+2] << 16) | (u8[off+3] << 24)) >>> 0;
+                    }
+                    function bytesToStr(u8, off, len) {
+                        const sub = u8.slice(off, off + len);
+                        return new TextDecoder('utf-8', { fatal: false }).decode(sub);
+                    }
+
+                    const id = bytesToStr(tail, footerOffset, 8);
+                    if (id !== 'APETAGEX') return null;
+
+                    const version = readLE32(tail, footerOffset + 8);
+                    const tagSize = readLE32(tail, footerOffset + 12);
+                    const itemCount = readLE32(tail, footerOffset + 16);
+
+                    // Sanity checks
+                    if (!tagSize || tagSize < FOOTER_SIZE || tagSize > (1024 * 1024 * 8)) return null; // cap at 8MB
+                    if (itemCount > 10000) return null;
+
+                    // Tag start relative to file end
+                    const absoluteTagStart = fileObj.size - tagSize;
+                    if (absoluteTagStart < 0) return null;
+
+                    // Ensure we have the whole tag area; if not, read exact slice
+                    let tagU8;
+                    if (absoluteTagStart >= tailStart) {
+                        tagU8 = tail.slice(absoluteTagStart - tailStart, tail.length);
+                    } else {
+                        const tagBlob = fileObj.slice(absoluteTagStart, fileObj.size);
+                        tagU8 = new Uint8Array(await tagBlob.arrayBuffer());
+                    }
+
+                    // Parse items. Items typically start at beginning of tag (header optional) and end before footer.
+                    // If a header is present, it is also 32 bytes and begins with APETAGEX.
+                    let cursor = 0;
+
+                    // Skip optional header if present
+                    const maybeHeaderId = bytesToStr(tagU8, 0, 8);
+                    if (maybeHeaderId === 'APETAGEX') {
+                        cursor = FOOTER_SIZE;
+                    }
+
+                    const out = {};
+                    for (let i = 0; i < itemCount && cursor + 8 < tagU8.length; i++) {
+                        const valueSize = readLE32(tagU8, cursor);
+                        const flags = readLE32(tagU8, cursor + 4);
+                        cursor += 8;
+
+                        // read key (null-terminated)
+                        let keyEnd = cursor;
+                        while (keyEnd < tagU8.length && tagU8[keyEnd] !== 0) keyEnd++;
+                        if (keyEnd >= tagU8.length) break;
+
+                        const key = bytesToStr(tagU8, cursor, keyEnd - cursor);
+                        cursor = keyEnd + 1;
+
+                        if (cursor + valueSize > tagU8.length) break;
+
+                        const valueBytes = tagU8.slice(cursor, cursor + valueSize);
+                        cursor += valueSize;
+
+                        // Flags bits 1-2 indicate encoding; but most are UTF-8.
+                        // We'll decode as UTF-8 and trim nulls.
+                        let value = new TextDecoder('utf-8', { fatal: false }).decode(valueBytes);
+                        value = value.replace(/\u0000/g, '').trim();
+
+                        if (key) out[key.toLowerCase()] = value;
+                    }
+
+                    return {
+                        title: out['title'] || null,
+                        artist: out['artist'] || out['album artist'] || out['albumartist'] || null,
+                        album: out['album'] || null
+                    };
+                } catch (e) {
+                    console.log('APEv2 parse failed:', e);
+                    return null;
+                }
+            }
+
+            // 1) Try music-metadata-browser (supports ID3, APE, Vorbis, MP4, etc.)
+            try {
+                if (window.musicMetadata && typeof window.musicMetadata.parseBlob === 'function') {
+                    const meta = await window.musicMetadata.parseBlob(file);
+                    const common = meta && meta.common ? meta.common : {};
+                    const result = empty();
+
+                    result.title = common.title || null;
+                    result.artist = common.artist || common.albumartist || null;
+                    result.album = common.album || null;
+
+                    const pic = (common.picture && common.picture.length) ? common.picture[0] : null;
+                    if (pic && pic.data) {
+                        const uint8 = (pic.data instanceof Uint8Array) ? pic.data : new Uint8Array(pic.data);
+                        const format = pic.format || 'image/jpeg';
+                        const blob = new Blob([uint8], { type: format });
+                        const url = URL.createObjectURL(blob);
+                        result.picture = url;
+                        result.pictureData = Array.from(uint8);
+                        result.pictureFormat = format;
+                    }
+
+                    // If fields are missing, attempt APEv2 to fill them
+                    if (!result.title || !result.artist || !result.album) {
+                        const ape = await parseAPEv2FromFile(file);
+                        if (ape) {
+                            if (!result.title && ape.title) result.title = ape.title;
+                            if (!result.artist && ape.artist) result.artist = ape.artist;
+                            if (!result.album && ape.album) result.album = ape.album;
+                        }
+                    }
+
+                    return result;
+                }
+            } catch (e) {
+                console.log('music-metadata-browser failed:', e);
+            }
+
+            // 2) Fallback: jsmediatags (ID3-focused)
+            try {
+                const res = await new Promise((resolve) => {
+                    if (!window.jsmediatags) return resolve(null);
+
+                    window.jsmediatags.read(file, {
+                        onSuccess: async function(tag) {
+                            const tags = tag.tags || {};
+                            const result = empty();
+
+                            result.title = tags.title || null;
+                            result.artist = tags.artist || null;
+                            result.album = tags.album || null;
+
+                            if (tags.picture && tags.picture.data && tags.picture.format) {
+                                try {
+                                    const { data, format } = tags.picture;
+                                    let uint8Array;
+                                    if (data instanceof ArrayBuffer) uint8Array = new Uint8Array(data);
+                                    else if (Array.isArray(data)) uint8Array = new Uint8Array(data);
+                                    else if (data instanceof Uint8Array) uint8Array = data;
+
+                                    if (uint8Array) {
+                                        const blob = new Blob([uint8Array], { type: format });
+                                        const url = URL.createObjectURL(blob);
+                                        result.picture = url;
+                                        result.pictureData = Array.from(uint8Array);
+                                        result.pictureFormat = format;
+                                    }
+                                } catch (artError) {
+                                    console.log('Error extracting album art (jsmediatags):', artError);
+                                }
+                            }
+
+                            // If still missing, attempt APEv2 to fill them
+                            if (!result.title || !result.artist || !result.album) {
+                                const ape = await parseAPEv2FromFile(file);
+                                if (ape) {
+                                    if (!result.title && ape.title) result.title = ape.title;
+                                    if (!result.artist && ape.artist) result.artist = ape.artist;
+                                    if (!result.album && ape.album) result.album = ape.album;
+                                }
+                            }
+
+                            resolve(result);
+                        },
+                        onError: function(error) {
+                            console.log('jsmediatags failed:', error);
+                            resolve(null);
+                        }
+                    });
+                });
+
+                if (res) return res;
+            } catch (e) {
+                console.log('jsmediatags wrapper failed:', e);
+            }
+
+            // 3) Last resort: try APEv2 alone (no art)
+            const apeOnly = await parseAPEv2FromFile(file);
+            if (apeOnly) {
+                const out = empty();
+                out.title = apeOnly.title;
+                out.artist = apeOnly.artist;
+                out.album = apeOnly.album;
+                return out;
+            }
+
+            return null;
         }
 
         function getCurrentMenuList() {
@@ -1570,29 +1842,26 @@
             const artist = document.getElementById('np-artist');
             const album = document.getElementById('np-album');
 
-            // Ensure we have metadata values
-            const songTitle = song.name || song.title || 'Unknown Title';
+            // Ensure we have metadata values - check all possible field names
+            const songTitle = song.title || song.name || 'Unknown Title';
             const songArtist = song.artist || 'Unknown Artist';
             const songAlbum = song.album || 'Unknown Album';
 
+            console.log('Raw song object:', song);
+            console.log('Setting Now Playing text:', { songTitle, songArtist, songAlbum });
+
+            // Set text content directly
             title.textContent = songTitle;
             artist.textContent = songArtist;
 
-            // Show album if available
+            // Show album if available and not unknown
             if (songAlbum && songAlbum !== 'Unknown Album') {
                 album.textContent = songAlbum;
                 album.classList.remove('hidden');
             } else {
+                album.textContent = '';
                 album.classList.add('hidden');
             }
-
-            // Debug log to verify metadata
-            console.log('Now Playing:', {
-                title: songTitle,
-                artist: songArtist,
-                album: songAlbum,
-                hasArt: !!song.art
-            });
 
             // Apply dark mode styles if active
             if (state.darkMode) {
@@ -1607,30 +1876,51 @@
                 album.style.color = '';
             }
 
-            // Ensure line-clamp styles persist
-            title.style.display = '-webkit-box';
-            title.style.webkitLineClamp = '2';
-            title.style.webkitBoxOrient = 'vertical';
-            title.style.overflow = 'hidden';
+            // Apply text overflow handling via inline styles for maximum compatibility
+            title.style.cssText = `
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                font-size: 14px;
+                font-weight: 700;
+                line-height: 1.2;
+                margin-bottom: 4px;
+                max-height: 34px;
+                ${state.darkMode ? 'color: #9ae69a; text-shadow: 0 0 10px rgba(154, 230, 154, 0.5);' : 'color: #111827;'}
+            `;
 
-            artist.style.display = '-webkit-box';
-            artist.style.webkitLineClamp = '1';
-            artist.style.webkitBoxOrient = 'vertical';
-            artist.style.overflow = 'hidden';
+            artist.style.cssText = `
+                display: block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 12px;
+                ${state.darkMode ? 'color: #6dd66d;' : 'color: #6b7280;'}
+            `;
 
-            album.style.display = '-webkit-box';
-            album.style.webkitLineClamp = '1';
-            album.style.webkitBoxOrient = 'vertical';
-            album.style.overflow = 'hidden';
+            album.style.cssText = `
+                display: block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 10px;
+                margin-top: 2px;
+                ${state.darkMode ? 'color: #4caf50;' : 'color: #9ca3af;'}
+            `;
 
             const artEl = document.getElementById('np-art');
             if (song.art) {
-                artEl.innerHTML = `<img src="${song.art}" class="w-full h-full object-cover rounded">`;
+                artEl.innerHTML = `<img src="${song.art}" class="w-full h-full object-cover rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display: block;">
+                    <div style="display: none;" class="w-full h-full flex items-center justify-center">
+                        <i data-lucide="music" class="w-16 h-16 ${state.darkMode ? 'text-[#6dd66d]' : 'text-gray-300'}"></i>
+                    </div>`;
             } else {
                 const iconColor = state.darkMode ? 'text-[#6dd66d]' : 'text-gray-300';
                 artEl.innerHTML = `<i data-lucide="music" class="w-16 h-16 ${iconColor}"></i>`;
-                lucide.createIcons();
             }
+            lucide.createIcons();
         }
 
         // Audio Functions
@@ -1639,6 +1929,7 @@
             let addedCount = 0;
 
             for (const file of files) {
+                console.log('Processing file:', file.name, 'Type:', file.type);
                 const url = URL.createObjectURL(file);
                 const song = {
                     name: file.name.replace(/\.[^/.]+$/, ""),
@@ -1654,21 +1945,38 @@
                 // Read metadata
                 try {
                     const tags = await readMetadata(file);
+                    console.log('Metadata result for', file.name, ':', tags);
+
                     if (tags) {
                         if (tags.title) {
                             song.name = tags.title;
                             song.title = tags.title;
                         }
-                        if (tags.artist) song.artist = tags.artist;
-                        if (tags.album) song.album = tags.album;
+                        if (tags.artist) {
+                            song.artist = tags.artist;
+                        }
+                        if (tags.album) {
+                            song.album = tags.album;
+                        }
                         if (tags.picture) {
                             song.art = tags.picture;
+                            song.pictureData = tags.pictureData;  // Store raw data for DB
+                            song.pictureFormat = tags.pictureFormat;
                         }
-                        console.log('Metadata read for', file.name, ':', tags);
                     }
                 } catch (e) {
-                    console.log('Could not read metadata for', file.name, e);
+                    console.error('Metadata error for', file.name, e);
                 }
+
+                console.log('Final song object:', {
+                    name: song.name,
+                    artist: song.artist,
+                    album: song.album,
+                    hasArt: !!song.art
+                });
+
+                // Apply filename/folder fallback if tags are missing
+                applyMetadataFallback(song, file);
 
                 state.songs.push(song);
                 addedCount++;
@@ -1681,7 +1989,6 @@
 
             // Stay in addSongs menu and refresh
             if (state.currentMenu === 'addSongs') {
-                // Keep selection at import option or move to newly added song
                 renderMenu();
             }
 
@@ -1874,9 +2181,11 @@
             if (files.length > 0) {
                 // Process files directly instead of using input to avoid clearing existing
                 for (const file of files) {
+                    console.log('Drag-drop processing file:', file.name);
                     const url = URL.createObjectURL(file);
                     const song = {
                         name: file.name.replace(/\.[^/.]+$/, ""),
+                        title: file.name.replace(/\.[^/.]+$/, ""),
                         artist: 'Unknown Artist',
                         album: 'Unknown Album',
                         url: url,
@@ -1888,17 +2197,26 @@
                     // Read metadata
                     try {
                         const tags = await readMetadata(file);
+                        console.log('Drag-drop metadata for', file.name, ':', tags);
                         if (tags) {
-                            if (tags.title) song.name = tags.title;
+                            if (tags.title) {
+                                song.name = tags.title;
+                                song.title = tags.title;
+                            }
                             if (tags.artist) song.artist = tags.artist;
                             if (tags.album) song.album = tags.album;
                             if (tags.picture) {
                                 song.art = tags.picture;
+                                song.pictureData = tags.pictureData;  // Store raw data for DB
+                                song.pictureFormat = tags.pictureFormat;
                             }
                         }
                     } catch (err) {
-                        console.log('Could not read metadata for', file.name);
+                        console.error('Drag-drop metadata error for', file.name, err);
                     }
+
+                    // Apply filename/folder fallback if tags are missing
+                    applyMetadataFallback(song, file);
 
                     state.songs.push(song);
                 }
@@ -1962,6 +2280,15 @@
             renderMenu();
             updatePlayIcon();
         }
+
+        // Check if jsmediatags loaded
+        window.addEventListener('load', () => {
+            if (window.jsmediatags) {
+                console.log('jsmediatags library loaded successfully');
+            } else {
+                console.error('jsmediatags library failed to load');
+            }
+        });
 
         // Initialize with persistence
         async function init() {
