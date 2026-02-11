@@ -331,15 +331,16 @@
 
                         <!-- Album Art - Large and Centered like real iPod -->
                         <div class="flex-1 flex items-center justify-center p-4 min-h-0">
-                            <div id="np-art" class="album-art-placeholder w-48 h-48 rounded shadow-lg flex items-center justify-center flex-shrink-0 border border-gray-200 bg-gray-100">
+                            <div id="np-art" class="album-art-placeholder w-48 h-48 rounded shadow-lg flex items-center justify-center flex-shrink-0 border border-gray-200 bg-gray-100 overflow-hidden">
                                 <i data-lucide="music" class="w-16 h-16 text-gray-300"></i>
                             </div>
                         </div>
 
                         <!-- Track Info Below Art -->
-                        <div class="px-4 pb-2 text-center flex-shrink-0">
-                            <div id="np-title" class="text-sm font-bold text-gray-900 truncate mb-0.5">No Song</div>
-                            <div id="np-artist" class="text-xs text-gray-500 truncate">Unknown Artist</div>
+                        <div class="px-4 pb-2 text-center flex-shrink-0 overflow-hidden" style="max-height: 80px;">
+                            <div id="np-title" class="text-sm font-bold text-gray-900 leading-tight mb-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">No Song</div>
+                            <div id="np-artist" class="text-xs text-gray-500 leading-tight" style="display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">Unknown Artist</div>
+                            <div id="np-album" class="text-[10px] text-gray-400 leading-tight mt-0.5 hidden" style="display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">Unknown Album</div>
                         </div>
 
                         <!-- Progress Bar -->
@@ -437,7 +438,7 @@
         // Menu Definitions
         const menus = {
             main: ['Music', 'Videos', 'Photos', 'Podcasts', 'Extras', 'Settings', 'Shuffle Songs', 'Now Playing'],
-            music: ['Import Songs', 'Delete Songs', 'Artists', 'Albums', 'Songs', 'Playlists', 'Now Playing'],
+            music: ['Add Songs', 'Artists', 'Albums', 'Songs', 'Playlists', 'Now Playing'],
             settings: ['About', 'Backlight', 'EQ', 'Shuffle', 'Repeat', 'Reset'],
             extras: ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Classic Silver'],
             songs: []
@@ -564,24 +565,68 @@
         async function saveSongsToDB(songs) {
             if (!db) return;
 
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
+            return new Promise(async (resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
 
-            // Clear existing songs
-            await store.clear();
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
 
-            // Store each song with its blob and metadata
-            for (const song of songs) {
-                const arrayBuffer = await song.file.arrayBuffer();
-                await store.add({
-                    name: song.name,
-                    artist: song.artist,
-                    album: song.album,
-                    art: song.art,
-                    data: arrayBuffer,
-                    type: song.file.type
-                });
-            }
+                // Clear existing songs
+                const clearRequest = store.clear();
+
+                clearRequest.onsuccess = async () => {
+                    // Store each song with its blob and metadata
+                    let completed = 0;
+
+                    for (let i = 0; i < songs.length; i++) {
+                        const song = songs[i];
+                        try {
+                            const arrayBuffer = await song.file.arrayBuffer();
+                            const songData = {
+                                name: song.name || song.title,
+                                title: song.name || song.title,
+                                artist: song.artist || 'Unknown Artist',
+                                album: song.album || 'Unknown Album',
+                                art: song.art || null,
+                                data: arrayBuffer,
+                                type: song.file.type
+                            };
+
+                            const addRequest = store.add(songData);
+                            addRequest.onsuccess = (event) => {
+                                song.id = event.target.result;
+                                completed++;
+                                if (completed === songs.length) {
+                                    resolve();
+                                }
+                            };
+                            addRequest.onerror = (e) => {
+                                console.error('Error adding song to DB:', e);
+                                completed++;
+                                if (completed === songs.length) {
+                                    resolve();
+                                }
+                            };
+                        } catch (e) {
+                            console.error('Error processing song for DB:', e);
+                            completed++;
+                            if (completed === songs.length) {
+                                resolve();
+                            }
+                        }
+                    }
+
+                    if (songs.length === 0) {
+                        resolve();
+                    }
+                };
+
+                clearRequest.onerror = (e) => {
+                    console.error('Error clearing store:', e);
+                    reject(e);
+                };
+            });
         }
 
         async function loadSongsFromDB() {
@@ -600,11 +645,12 @@
                         const file = new File([blob], s.name, { type: s.type });
 
                         return {
-                            name: s.name,
-                            artist: s.artist,
-                            album: s.album,
+                            name: s.name || s.title,
+                            title: s.name || s.title,
+                            artist: s.artist || 'Unknown Artist',
+                            album: s.album || 'Unknown Album',
                             url: url,
-                            art: null,
+                            art: s.art || null,
                             file: file,
                             id: s.id
                         };
@@ -1106,14 +1152,14 @@
 
             if (!selected) return;
 
-            // Handle actions based on selection
-            if (selected === 'Import Songs') {
+            // Handle Add Songs menu (Import New Songs option)
+            if (selected === '⊕ Import New Songs...') {
                 document.getElementById('file-input').click();
                 return;
             }
 
-            // Handle Delete Songs menu
-            if (state.currentMenu === 'deleteSongs') {
+            // Handle Delete from Add Songs menu
+            if (state.currentMenu === 'addSongs' && selected.includes('[DELETE]')) {
                 if (selected === 'No Songs') return;
                 // Extract song name from "Song Name [DELETE]"
                 const songName = selected.replace(' [DELETE]', '');
@@ -1124,16 +1170,13 @@
                 return;
             }
 
-            // Handle Delete Songs entry point
-            if (selected === 'Delete Songs') {
-                if (state.songs.length === 0) {
-                    return;
-                }
+            // Handle Add Songs entry point
+            if (selected === 'Add Songs') {
                 state.menuStack.push({
                     menu: state.currentMenu,
                     index: state.selectedIndex
                 });
-                state.currentMenu = 'deleteSongs';
+                state.currentMenu = 'addSongs';
                 state.selectedIndex = 0;
                 renderMenu();
                 return;
@@ -1296,12 +1339,56 @@
             }
         }
 
+        // Read metadata from audio file using jsmediatags
+        function readMetadata(file) {
+            return new Promise((resolve, reject) => {
+                if (!window.jsmediatags) {
+                    resolve(null);
+                    return;
+                }
+
+                jsmediatags.read(file, {
+                    onSuccess: function(tag) {
+                        const tags = tag.tags;
+                        const result = {
+                            title: tags.title,
+                            artist: tags.artist,
+                            album: tags.album,
+                            picture: null
+                        };
+
+                        // Convert album art to data URL if present
+                        if (tags.picture) {
+                            const { data, format } = tags.picture;
+                            const uint8Array = new Uint8Array(data);
+                            const blob = new Blob([uint8Array], { type: format });
+                            const url = URL.createObjectURL(blob);
+                            result.picture = url;
+                        }
+
+                        resolve(result);
+                    },
+                    onError: function(error) {
+                        console.log('Error reading metadata:', error);
+                        resolve(null);
+                    }
+                });
+            });
+        }
+
         function getCurrentMenuList() {
             if (state.currentMenu === 'songs') {
                 return state.songs.length > 0 ? state.songs.map(s => s.name) : ['No Songs'];
             }
-            if (state.currentMenu === 'deleteSongs') {
-                return state.songs.length > 0 ? state.songs.map(s => `${s.name} [DELETE]`) : ['No Songs'];
+            if (state.currentMenu === 'addSongs') {
+                // Combined Add Songs menu: Import option + deletable songs
+                const list = ['⊕ Import New Songs...'];
+                if (state.songs.length > 0) {
+                    state.songs.forEach(song => {
+                        list.push(`${song.name} [DELETE]`);
+                    });
+                }
+                return list;
             }
             if (state.currentMenu === 'artists') {
                 if (state.songs.length === 0) return ['No Artists'];
@@ -1372,6 +1459,7 @@
                 const hasSubmenu = menus[item.toLowerCase()] ||
                     (item === 'Music' && state.songs.length === 0) ||
                     item === 'Songs' ||
+                    item === 'Add Songs' ||
                     (state.currentMenu === 'music' && (item === 'Artists' || item === 'Albums')) ||
                     ((state.currentMenu === 'artists' || state.currentMenu === 'albums') && item !== 'No Artists' && item !== 'No Albums') ||
                     ((state.currentMenu === 'artistSongs' || state.currentMenu === 'albumSongs') && item !== 'No Songs');
@@ -1480,20 +1568,64 @@
             const song = state.songs[state.currentSongIndex];
             const title = document.getElementById('np-title');
             const artist = document.getElementById('np-artist');
+            const album = document.getElementById('np-album');
 
-            title.textContent = song.name;
-            artist.textContent = song.artist || 'Unknown Artist';
+            // Ensure we have metadata values
+            const songTitle = song.name || song.title || 'Unknown Title';
+            const songArtist = song.artist || 'Unknown Artist';
+            const songAlbum = song.album || 'Unknown Album';
+
+            title.textContent = songTitle;
+            artist.textContent = songArtist;
+
+            // Show album if available
+            if (songAlbum && songAlbum !== 'Unknown Album') {
+                album.textContent = songAlbum;
+                album.classList.remove('hidden');
+            } else {
+                album.classList.add('hidden');
+            }
+
+            // Debug log to verify metadata
+            console.log('Now Playing:', {
+                title: songTitle,
+                artist: songArtist,
+                album: songAlbum,
+                hasArt: !!song.art
+            });
 
             // Apply dark mode styles if active
             if (state.darkMode) {
-                title.style.color = '#93c5fd';
-                title.style.textShadow = '0 0 10px rgba(147, 197, 253, 0.5)';
-                artist.style.color = '#60a5fa';
+                title.style.color = '#9ae69a';
+                title.style.textShadow = '0 0 10px rgba(154, 230, 154, 0.5)';
+                artist.style.color = '#6dd66d';
+                album.style.color = '#4caf50';
+            } else {
+                title.style.color = '';
+                title.style.textShadow = '';
+                artist.style.color = '';
+                album.style.color = '';
             }
+
+            // Ensure line-clamp styles persist
+            title.style.display = '-webkit-box';
+            title.style.webkitLineClamp = '2';
+            title.style.webkitBoxOrient = 'vertical';
+            title.style.overflow = 'hidden';
+
+            artist.style.display = '-webkit-box';
+            artist.style.webkitLineClamp = '1';
+            artist.style.webkitBoxOrient = 'vertical';
+            artist.style.overflow = 'hidden';
+
+            album.style.display = '-webkit-box';
+            album.style.webkitLineClamp = '1';
+            album.style.webkitBoxOrient = 'vertical';
+            album.style.overflow = 'hidden';
 
             const artEl = document.getElementById('np-art');
             if (song.art) {
-                artEl.innerHTML = `<img src="${song.art}" class="w-full h-full object-cover">`;
+                artEl.innerHTML = `<img src="${song.art}" class="w-full h-full object-cover rounded">`;
             } else {
                 const iconColor = state.darkMode ? 'text-[#6dd66d]' : 'text-gray-300';
                 artEl.innerHTML = `<i data-lucide="music" class="w-16 h-16 ${iconColor}"></i>`;
@@ -1504,34 +1636,42 @@
         // Audio Functions
         async function handleFileSelect(event) {
             const files = Array.from(event.target.files);
+            let addedCount = 0;
 
             for (const file of files) {
                 const url = URL.createObjectURL(file);
                 const song = {
                     name: file.name.replace(/\.[^/.]+$/, ""),
+                    title: file.name.replace(/\.[^/.]+$/, ""),
                     artist: 'Unknown Artist',
                     album: 'Unknown Album',
                     url: url,
                     art: null,
-                    file: file
+                    file: file,
+                    id: null
                 };
 
                 // Read metadata
                 try {
                     const tags = await readMetadata(file);
                     if (tags) {
-                        if (tags.title) song.name = tags.title;
+                        if (tags.title) {
+                            song.name = tags.title;
+                            song.title = tags.title;
+                        }
                         if (tags.artist) song.artist = tags.artist;
                         if (tags.album) song.album = tags.album;
                         if (tags.picture) {
                             song.art = tags.picture;
                         }
+                        console.log('Metadata read for', file.name, ':', tags);
                     }
                 } catch (e) {
-                    console.log('Could not read metadata for', file.name);
+                    console.log('Could not read metadata for', file.name, e);
                 }
 
                 state.songs.push(song);
+                addedCount++;
             }
 
             // Save to IndexedDB for persistence
@@ -1539,8 +1679,9 @@
 
             menus.songs = state.songs.map(s => s.name);
 
-            // Return to music menu
-            if (state.currentMenu === 'songs') {
+            // Stay in addSongs menu and refresh
+            if (state.currentMenu === 'addSongs') {
+                // Keep selection at import option or move to newly added song
                 renderMenu();
             }
 
@@ -1740,7 +1881,8 @@
                         album: 'Unknown Album',
                         url: url,
                         art: null,
-                        file: file
+                        file: file,
+                        id: null
                     };
 
                     // Read metadata
@@ -1807,13 +1949,13 @@
 
             // Re-render menu
             if (state.songs.length === 0) {
-                // Go back to music menu if no songs left
-                state.currentMenu = 'music';
+                // Stay in addSongs menu but show only import option
                 state.selectedIndex = 0;
             } else {
-                // Stay in delete menu but adjust index
-                if (state.selectedIndex >= state.songs.length) {
-                    state.selectedIndex = state.songs.length - 1;
+                // Stay in addSongs menu but adjust index
+                // +1 because index 0 is the Import option
+                if (state.selectedIndex > state.songs.length) {
+                    state.selectedIndex = state.songs.length;
                 }
             }
 
