@@ -6,6 +6,7 @@
     <title>iPod Classic</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsmediatags@3.9.5/dist/jsmediatags.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -428,13 +429,15 @@
             duration: 0,
             shuffle: false,
             repeat: false,
-            darkMode: false
+            darkMode: false,
+            selectedArtist: null,
+            selectedAlbum: null
         };
 
         // Menu Definitions
         const menus = {
             main: ['Music', 'Videos', 'Photos', 'Podcasts', 'Extras', 'Settings', 'Shuffle Songs', 'Now Playing'],
-            music: ['Import Songs', 'Artists', 'Albums', 'Songs', 'Playlists', 'Now Playing'],
+            music: ['Import Songs', 'Delete Songs', 'Artists', 'Albums', 'Songs', 'Playlists', 'Now Playing'],
             settings: ['About', 'Backlight', 'EQ', 'Shuffle', 'Repeat', 'Reset'],
             extras: ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Classic Silver'],
             songs: []
@@ -567,13 +570,14 @@
             // Clear existing songs
             await store.clear();
 
-            // Store each song with its blob
+            // Store each song with its blob and metadata
             for (const song of songs) {
                 const arrayBuffer = await song.file.arrayBuffer();
                 await store.add({
                     name: song.name,
                     artist: song.artist,
                     album: song.album,
+                    art: song.art,
                     data: arrayBuffer,
                     type: song.file.type
                 });
@@ -1108,6 +1112,101 @@
                 return;
             }
 
+            // Handle Delete Songs menu
+            if (state.currentMenu === 'deleteSongs') {
+                if (selected === 'No Songs') return;
+                // Extract song name from "Song Name [DELETE]"
+                const songName = selected.replace(' [DELETE]', '');
+                const songIndex = state.songs.findIndex(s => s.name === songName);
+                if (songIndex !== -1) {
+                    deleteSong(songIndex);
+                }
+                return;
+            }
+
+            // Handle Delete Songs entry point
+            if (selected === 'Delete Songs') {
+                if (state.songs.length === 0) {
+                    return;
+                }
+                state.menuStack.push({
+                    menu: state.currentMenu,
+                    index: state.selectedIndex
+                });
+                state.currentMenu = 'deleteSongs';
+                state.selectedIndex = 0;
+                renderMenu();
+                return;
+            }
+
+            // Handle Artists menu
+            if (selected === 'Artists' && state.currentMenu === 'music') {
+                state.menuStack.push({
+                    menu: state.currentMenu,
+                    index: state.selectedIndex
+                });
+                state.currentMenu = 'artists';
+                state.selectedIndex = 0;
+                renderMenu();
+                return;
+            }
+
+            // Handle Albums menu
+            if (selected === 'Albums' && state.currentMenu === 'music') {
+                state.menuStack.push({
+                    menu: state.currentMenu,
+                    index: state.selectedIndex
+                });
+                state.currentMenu = 'albums';
+                state.selectedIndex = 0;
+                renderMenu();
+                return;
+            }
+
+            // Handle selecting an artist
+            if (state.currentMenu === 'artists' && selected !== 'No Artists') {
+                state.menuStack.push({
+                    menu: state.currentMenu,
+                    index: state.selectedIndex
+                });
+                state.selectedArtist = selected;
+                state.currentMenu = 'artistSongs';
+                state.selectedIndex = 0;
+                renderMenu();
+                return;
+            }
+
+            // Handle selecting an album
+            if (state.currentMenu === 'albums' && selected !== 'No Albums') {
+                state.menuStack.push({
+                    menu: state.currentMenu,
+                    index: state.selectedIndex
+                });
+                state.selectedAlbum = selected;
+                state.currentMenu = 'albumSongs';
+                state.selectedIndex = 0;
+                renderMenu();
+                return;
+            }
+
+            // Handle playing from artist songs
+            if (state.currentMenu === 'artistSongs' && selected !== 'No Songs') {
+                const songIndex = state.songs.findIndex(s => s.name === selected && (s.artist || 'Unknown Artist') === state.selectedArtist);
+                if (songIndex !== -1) {
+                    playSong(songIndex);
+                }
+                return;
+            }
+
+            // Handle playing from album songs
+            if (state.currentMenu === 'albumSongs' && selected !== 'No Songs') {
+                const songIndex = state.songs.findIndex(s => s.name === selected && (s.album || 'Unknown Album') === state.selectedAlbum);
+                if (songIndex !== -1) {
+                    playSong(songIndex);
+                }
+                return;
+            }
+
             // Color selection in Extras
             if (state.currentMenu === 'extras') {
                 const colors = {
@@ -1201,6 +1300,29 @@
             if (state.currentMenu === 'songs') {
                 return state.songs.length > 0 ? state.songs.map(s => s.name) : ['No Songs'];
             }
+            if (state.currentMenu === 'deleteSongs') {
+                return state.songs.length > 0 ? state.songs.map(s => `${s.name} [DELETE]`) : ['No Songs'];
+            }
+            if (state.currentMenu === 'artists') {
+                if (state.songs.length === 0) return ['No Artists'];
+                const artists = [...new Set(state.songs.map(s => s.artist || 'Unknown Artist'))].sort();
+                return artists;
+            }
+            if (state.currentMenu === 'albums') {
+                if (state.songs.length === 0) return ['No Albums'];
+                const albums = [...new Set(state.songs.map(s => s.album || 'Unknown Album'))].sort();
+                return albums;
+            }
+            if (state.currentMenu === 'artistSongs') {
+                if (!state.selectedArtist) return ['No Songs'];
+                const songs = state.songs.filter(s => (s.artist || 'Unknown Artist') === state.selectedArtist).map(s => s.name);
+                return songs.length > 0 ? songs : ['No Songs'];
+            }
+            if (state.currentMenu === 'albumSongs') {
+                if (!state.selectedAlbum) return ['No Songs'];
+                const songs = state.songs.filter(s => (s.album || 'Unknown Album') === state.selectedAlbum).map(s => s.name);
+                return songs.length > 0 ? songs : ['No Songs'];
+            }
             return menus[state.currentMenu] || [];
         }
 
@@ -1247,7 +1369,12 @@
                 }
 
                 // Add arrow for submenus - dark mode appropriate colors
-                const hasSubmenu = menus[item.toLowerCase()] || (item === 'Music' && state.songs.length === 0) || item === 'Songs';
+                const hasSubmenu = menus[item.toLowerCase()] ||
+                    (item === 'Music' && state.songs.length === 0) ||
+                    item === 'Songs' ||
+                    (state.currentMenu === 'music' && (item === 'Artists' || item === 'Albums')) ||
+                    ((state.currentMenu === 'artists' || state.currentMenu === 'albums') && item !== 'No Artists' && item !== 'No Albums') ||
+                    ((state.currentMenu === 'artistSongs' || state.currentMenu === 'albumSongs') && item !== 'No Songs');
                 let arrow = '';
                 if (hasSubmenu) {
                     if (state.darkMode) {
@@ -1354,7 +1481,7 @@
             const title = document.getElementById('np-title');
             const artist = document.getElementById('np-artist');
 
-            title.textContent = song.name.replace(/\.[^/.]+$/, "");
+            title.textContent = song.name;
             artist.textContent = song.artist || 'Unknown Artist';
 
             // Apply dark mode styles if active
@@ -1378,17 +1505,34 @@
         async function handleFileSelect(event) {
             const files = Array.from(event.target.files);
 
-            files.forEach(file => {
+            for (const file of files) {
                 const url = URL.createObjectURL(file);
-                state.songs.push({
-                    name: file.name,
+                const song = {
+                    name: file.name.replace(/\.[^/.]+$/, ""),
                     artist: 'Unknown Artist',
                     album: 'Unknown Album',
                     url: url,
                     art: null,
                     file: file
-                });
-            });
+                };
+
+                // Read metadata
+                try {
+                    const tags = await readMetadata(file);
+                    if (tags) {
+                        if (tags.title) song.name = tags.title;
+                        if (tags.artist) song.artist = tags.artist;
+                        if (tags.album) song.album = tags.album;
+                        if (tags.picture) {
+                            song.art = tags.picture;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not read metadata for', file.name);
+                }
+
+                state.songs.push(song);
+            }
 
             // Save to IndexedDB for persistence
             await saveSongsToDB(state.songs);
@@ -1581,19 +1725,101 @@
             dropZone.style.transform = 'scale(1)';
         });
 
-        dropZone.addEventListener('drop', (e) => {
+        dropZone.addEventListener('drop', async (e) => {
             e.preventDefault();
             dropZone.style.transform = 'scale(1)';
 
             const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
             if (files.length > 0) {
-                const input = document.getElementById('file-input');
-                const dt = new DataTransfer();
-                files.forEach(f => dt.items.add(f));
-                input.files = dt.files;
-                handleFileSelect({ target: input });
+                // Process files directly instead of using input to avoid clearing existing
+                for (const file of files) {
+                    const url = URL.createObjectURL(file);
+                    const song = {
+                        name: file.name.replace(/\.[^/.]+$/, ""),
+                        artist: 'Unknown Artist',
+                        album: 'Unknown Album',
+                        url: url,
+                        art: null,
+                        file: file
+                    };
+
+                    // Read metadata
+                    try {
+                        const tags = await readMetadata(file);
+                        if (tags) {
+                            if (tags.title) song.name = tags.title;
+                            if (tags.artist) song.artist = tags.artist;
+                            if (tags.album) song.album = tags.album;
+                            if (tags.picture) {
+                                song.art = tags.picture;
+                            }
+                        }
+                    } catch (err) {
+                        console.log('Could not read metadata for', file.name);
+                    }
+
+                    state.songs.push(song);
+                }
+
+                await saveSongsToDB(state.songs);
+                menus.songs = state.songs.map(s => s.name);
+                renderMenu();
+                playSelect();
             }
         });
+
+        // Delete song function
+        async function deleteSong(index) {
+            if (index < 0 || index >= state.songs.length) return;
+
+            // Remove from array
+            const removedSong = state.songs.splice(index, 1)[0];
+
+            // Revoke object URL to free memory
+            if (removedSong.url) {
+                URL.revokeObjectURL(removedSong.url);
+            }
+
+            // Save updated songs to DB
+            await saveSongsToDB(state.songs);
+
+            // Update menus
+            menus.songs = state.songs.map(s => s.name);
+
+            // Adjust current song index if needed
+            if (state.currentSongIndex === index) {
+                // Deleted the currently playing song
+                if (state.songs.length > 0) {
+                    // Play next song or first if at end
+                    const nextIndex = Math.min(index, state.songs.length - 1);
+                    playSong(nextIndex);
+                } else {
+                    state.currentSongIndex = -1;
+                    state.isPlaying = false;
+                    state.audio.pause();
+                    state.audio.src = '';
+                    showMenu();
+                }
+            } else if (state.currentSongIndex > index) {
+                // Adjust index since we removed a song before current
+                state.currentSongIndex--;
+            }
+
+            // Re-render menu
+            if (state.songs.length === 0) {
+                // Go back to music menu if no songs left
+                state.currentMenu = 'music';
+                state.selectedIndex = 0;
+            } else {
+                // Stay in delete menu but adjust index
+                if (state.selectedIndex >= state.songs.length) {
+                    state.selectedIndex = state.songs.length - 1;
+                }
+            }
+
+            renderMenu();
+            updatePlayIcon();
+        }
 
         // Initialize with persistence
         async function init() {
